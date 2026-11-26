@@ -1,0 +1,543 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cap Abdelrhman | Website Security Analyzer</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;background:#07111f;color:#eaf2ff;
+ font-family:Arial,Tahoma,sans-serif;padding:18px;
+}
+.container{max-width:950px;margin:auto}
+.header{text-align:center;padding:25px 10px}
+.logo{
+ display:inline-block;border:2px solid #00d9ff;
+ color:#00d9ff;padding:10px 20px;
+ font-weight:bold;letter-spacing:2px;
+ border-radius:12px;
+}
+h1{font-size:27px;margin-bottom:8px}
+.subtitle{color:#91a7c4}
+.panel{
+ background:#101e30;border:1px solid #263c56;
+ border-radius:16px;padding:20px;margin-bottom:20px;
+}
+input{
+ width:100%;padding:16px;border-radius:10px;
+ border:1px solid #38516d;background:#071321;
+ color:white;font-size:16px;direction:ltr;
+}
+button{
+ border:0;padding:13px 17px;border-radius:10px;
+ font-weight:bold;cursor:pointer;margin:5px;
+}
+.primary{background:#00c8ed;color:#00121b}
+.secondary{background:#263e5a;color:white}
+.danger{background:#a92c43;color:white}
+button:disabled{opacity:.5}
+.actions{margin-top:12px;display:flex;flex-wrap:wrap}
+.note{font-size:13px;color:#a8bad0;line-height:1.8}
+.hidden{display:none}
+.result{text-align:center}
+.score{
+ font-size:58px;font-weight:bold;margin:12px;
+ color:#22c55e;
+}
+.meter{
+ height:15px;background:#26384d;
+ border-radius:20px;overflow:hidden;margin:15px 0;
+}
+.meter div{height:100%;width:0%;transition:.5s}
+.status{font-size:19px;font-weight:bold}
+.grid{
+ display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+ gap:12px;margin-top:15px;
+}
+.item{
+ background:#0a1727;border:1px solid #263c56;
+ border-radius:10px;padding:14px;
+}
+.item small{color:#91a7c4;display:block;margin-bottom:8px}
+.item strong{overflow-wrap:anywhere}
+#report{
+ background:white;color:#172033;border-radius:12px;
+ padding:25px;margin-top:20px;
+ direction:rtl;
+}
+#report h2,#report h3{color:#102b49}
+.report-en{direction:ltr;text-align:left}
+.report-section{
+ border-bottom:1px solid #d9e0e8;
+ padding:13px 0;line-height:1.8;
+}
+.report-section p{margin:5px 0}
+.report-score{font-size:35px;font-weight:bold}
+.footer{text-align:center;color:#7188a6;font-size:12px;padding:20px}
+a{color:#0783c0;overflow-wrap:anywhere}
+@media print{
+ body{background:white;color:black;padding:0}
+ .container{max-width:100%}
+ .header,.input-panel,.actions,.footer,.screen-only{display:none!important}
+ .panel{background:white;border:0;padding:0}
+ #report{display:block!important;padding:10px;margin:0}
+ #report h2,#report h3{color:#102b49}
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+ <div class="logo">CAP ABDELRHMAN</div>
+ <h1>Website Security Analyzer</h1>
+ <div class="subtitle">أداة تحليل الروابط وتقييم مؤشرات أمان المواقع</div>
+</div>
+
+<div class="panel input-panel">
+ <h3>🔍 فحص رابط الموقع</h3>
+ <input id="urlInput" type="text" placeholder="https://example.com">
+ <div class="actions">
+  <button class="primary" id="scanBtn" onclick="scanSite()">ابدأ الفحص</button>
+  <button class="secondary" onclick="clearAll()">مسح البيانات</button>
+ </div>
+ <p class="note">
+ الأداة تجمع معلومات عامة عن الرابط والنطاق وDNS وعنوان IP.
+ لا تفتح الموقع المستهدف ولا تنفذ اختبارات اختراق.
+ فحص السمعة عبر VirusTotal وURLScan يحتاج إلى مراجعة الخدمة الخارجية.
+ </p>
+</div>
+
+<div id="loading" class="panel hidden">
+ جاري تحليل المعلومات العامة... يرجى الانتظار
+</div>
+
+<div id="resultPanel" class="panel hidden">
+ <div class="result">
+  <h2>Security Score / تقييم الأمان</h2>
+  <div class="score" id="score">--%</div>
+  <div class="meter"><div id="meterBar"></div></div>
+  <div class="status" id="scoreStatus"></div>
+  <p class="note" id="scoreDescription"></p>
+ </div>
+ <div class="grid" id="quickResults"></div>
+ <div class="actions screen-only">
+  <button class="primary" onclick="printReport()">طباعة / حفظ PDF</button>
+  <button class="secondary" onclick="downloadTXT()">تنزيل التقرير TXT</button>
+  <button class="secondary" onclick="copyReport()">نسخ التقرير</button>
+ </div>
+</div>
+
+<div id="report" class="hidden">
+ <div style="text-align:center">
+  <h2>CAP ABDELRHMAN</h2>
+  <h3>Website Security Analysis Report</h3>
+  <p>تقرير تحليل أمان الموقع الإلكتروني</p>
+  <hr>
+ </div>
+ <div id="reportContent"></div>
+ <div style="margin-top:25px;text-align:center;font-size:12px;color:#64748b">
+  Cap Abdelrhman | Website Security Analyzer<br>
+  This report is based on publicly available information.
+ </div>
+</div>
+
+<div class="footer">
+ CAP ABDELRHMAN © 2026 | Educational Security Analysis
+</div>
+</div>
+
+<script>
+let reportText = "";
+let reportData = {};
+
+function escapeHTML(value){
+ return String(value ?? "").replace(/[&<>"']/g, c => ({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+ }[c]));
+}
+
+function normalizeURL(value){
+ let input=value.trim();
+ if(!input) throw new Error("من فضلك أدخل رابط الموقع");
+ if(!/^https?:\/\//i.test(input)) input="https://"+input;
+ const url=new URL(input);
+ if(!["http:","https:"].includes(url.protocol))
+  throw new Error("نوع الرابط غير مدعوم");
+ return url;
+}
+
+async function fetchJSON(url){
+ const controller=new AbortController();
+ const timer=setTimeout(()=>controller.abort(),10000);
+ try{
+  const response=await fetch(url,{signal:controller.signal});
+  if(!response.ok) throw new Error("HTTP "+response.status);
+  return await response.json();
+ }finally{clearTimeout(timer)}
+}
+
+function classifyScore(score){
+ if(score>=90) return {
+  label:"مؤشرات أمان مرتفعة | High Security Indicators",
+  color:"#16a34a",
+  description:"الفحوصات المتاحة أظهرت مؤشرات جيدة، لكن هذا لا يضمن خلو الموقع من التهديدات."
+ };
+ if(score>=70) return {
+  label:"مؤشرات جيدة مع ملاحظات | Good with Notes",
+  color:"#65a30d",
+  description:"ظهرت مؤشرات إيجابية، مع وجود بيانات تحتاج إلى مراجعة إضافية."
+ };
+ if(score>=40) return {
+  label:"يحتاج إلى الحذر | Use Caution",
+  color:"#d97706",
+  description:"بعض مؤشرات الأمان غير مكتملة أو تحتاج إلى تحقق."
+ };
+ return {
+  label:"مؤشرات خطر مرتفعة | Elevated Risk Indicators",
+  color:"#dc2626",
+  description:"المعلومات المتاحة لا تكفي لاعتبار الموقع آمنًا. تعامل معه بحذر."
+ };
+}
+
+function section(title,body){
+ return `<div class="report-section"><h3>${title}</h3>${body}</div>`;
+}
+
+async function scanSite(){
+ const btn=document.getElementById("scanBtn");
+ let url;
+ try{
+  url=normalizeURL(document.getElementById("urlInput").value);
+ }catch(e){alert(e.message);return}
+
+ btn.disabled=true;
+ document.getElementById("loading").classList.remove("hidden");
+ document.getElementById("resultPanel").classList.add("hidden");
+ document.getElementById("report").classList.add("hidden");
+
+ const host=url.hostname;
+ const domain=host.replace(/^www\./i,"");
+ const isHTTPS=url.protocol==="https:";
+ let checks=[];
+ let details={};
+ let rdapStatus="لم يتم التحقق";
+ let dnsStatus="لم يتم التحقق";
+ let ipStatus="لم يتم التحقق";
+ let ipAddress="غير متاح";
+ let ipInfo={};
+ let dnsInfo={};
+ let rdapInfo={};
+ let errors=[];
+
+ // 1 - HTTPS
+ checks.push({
+  name:"HTTPS Encryption",
+  arabic:"اتصال HTTPS",
+  pass:isHTTPS,
+  points:20,
+  detail:isHTTPS?"الرابط يستخدم HTTPS":"الرابط لا يستخدم HTTPS"
+ });
+
+ // 2 - Domain RDAP
+ try{
+  rdapInfo=await fetchJSON(
+   "https://rdap.org/domain/"+encodeURIComponent(domain)
+  );
+  rdapStatus="تم الحصول على بيانات النطاق";
+  let events=rdapInfo.events||[];
+  let registration=events.find(x=>x.eventAction==="registration");
+  let expiry=events.find(x=>x.eventAction==="expiration");
+  details.created=registration?.eventDate||"غير متاح";
+  details.expiry=expiry?.eventDate||"غير متاح";
+  details.registrar=rdapInfo.entities?.[0]?.vcardArray?.[1]
+   ?.find(x=>x[0]==="fn")?.[3]||"غير متاح";
+  checks.push({
+   name:"Domain RDAP",
+   arabic:"بيانات النطاق",
+   pass:true,points:15,
+   detail:"تم العثور على سجل RDAP"
+  });
+ }catch(e){
+  errors.push("RDAP: "+e.message);
+  checks.push({
+   name:"Domain RDAP",
+   arabic:"بيانات النطاق",
+   pass:null,points:15,
+   detail:"تعذر جلب البيانات"
+  });
+ }
+
+ // 3 - DNS
+ try{
+  const dns=await fetchJSON(
+   "https://dns.google/resolve?name="+encodeURIComponent(domain)+"&type=A"
+  );
+  dnsInfo=dns;
+  let answers=dns.Answer||[];
+  ipAddress=answers.find(x=>x.type===1)?.data||"غير متاح";
+  dnsStatus=answers.length?"تم العثور على سجلات DNS":"لم يتم العثور على سجلات A";
+  checks.push({
+   name:"DNS Records",
+   arabic:"سجلات DNS",
+   pass:answers.length>0,
+   points:15,
+   detail:dnsStatus
+  });
+ }catch(e){
+  errors.push("DNS: "+e.message);
+  checks.push({
+   name:"DNS Records",
+   arabic:"سجلات DNS",
+   pass:null,points:15,
+   detail:"تعذر الاستعلام"
+  });
+ }
+
+ // 4 - IP Information
+ if(ipAddress!=="غير متاح"){
+  try{
+   ipInfo=await fetchJSON(
+    "https://ipwho.is/"+encodeURIComponent(ipAddress)
+   );
+   if(ipInfo.success){
+    ipStatus="تم الحصول على معلومات IP";
+    checks.push({
+     name:"IP Intelligence",
+     arabic:"معلومات عنوان IP",
+     pass:true,points:10,
+     detail:"تم الحصول على معلومات عنوان IP"
+    });
+   }else throw new Error("IP lookup failed");
+  }catch(e){
+   errors.push("IP: "+e.message);
+   checks.push({
+    name:"IP Intelligence",
+    arabic:"معلومات عنوان IP",
+    pass:null,points:10,
+    detail:"تعذر الحصول على البيانات"
+   });
+  }
+ }else{
+  checks.push({
+   name:"IP Intelligence",
+   arabic:"معلومات عنوان IP",
+   pass:null,points:10,
+   detail:"لا يوجد عنوان IP متاح"
+  });
+ }
+
+ // 5 - URL structure
+ const suspiciousChars=/@|%40/.test(url.href);
+ const longURL=url.href.length>180;
+ const riskyExtension=/\.(exe|apk|bat|scr|cmd|js)(\/|$)/i.test(url.pathname);
+ let urlPass=!suspiciousChars&&!riskyExtension;
+ checks.push({
+  name:"URL Structure",
+  arabic:"تركيب الرابط",
+  pass:urlPass,
+  points:15,
+  detail:suspiciousChars?"الرابط يحتوي على علامة @":
+   riskyExtension?"امتداد ملف قابل للتنفيذ":
+   longURL?"الرابط طويل ويحتاج إلى مراجعة":
+   "لم يتم رصد هذه العلامات"
+ });
+
+ // 6 - Basic domain name check
+ let domainPass=domain.includes(".")&&!domain.includes("..")&&
+  !domain.startsWith("-")&&!domain.endsWith("-");
+ checks.push({
+  name:"Domain Format",
+  arabic:"صيغة النطاق",
+  pass:domainPass,
+  points:10,
+  detail:domainPass?"صيغة النطاق تبدو سليمة":"صيغة النطاق تحتاج إلى مراجعة"
+ });
+
+ // 7 - HTTP response test
+ // This is only a browser fetch attempt; failure is inconclusive.
+ let responseStatus="لم يتم اختبار استجابة الموقع";
+ try{
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),7000);
+  const response=await fetch(url.href,{
+   method:"HEAD",mode:"cors",signal:controller.signal
+  });
+  clearTimeout(timer);
+  responseStatus="استجاب الموقع لطلب HEAD برمز "+response.status;
+  checks.push({
+   name:"HTTP Response",
+   arabic:"استجابة الموقع",
+   pass:response.ok,
+   points:15,
+   detail:responseStatus
+  });
+ }catch(e){
+  responseStatus="تعذر اختبار استجابة الموقع من المتصفح";
+  checks.push({
+   name:"HTTP Response",
+   arabic:"استجابة الموقع",
+   pass:null,
+   points:15,
+   detail:responseStatus
+  });
+ }
+
+ // Score: count confirmed positive/negative checks only.
+ // Unknown checks are excluded from denominator.
+ let applicable=checks.filter(x=>x.pass!==null);
+ let earned=applicable.reduce((sum,x)=>sum+(x.pass?x.points:0),0);
+ let possible=applicable.reduce((sum,x)=>sum+x.points,0);
+ let score=possible?Math.round(earned/possible*100):0;
+
+ const classification=classifyScore(score);
+ const now=new Date();
+ const reportID="CAP-"+now.getTime().toString().slice(-9);
+
+ reportData={
+  url:url.href,host,domain,score,classification,checks,
+  now:now.toLocaleString("ar-EG"),
+  reportID,ipAddress,ipInfo,details,
+  rdapStatus,dnsStatus,ipStatus,responseStatus,
+  errors
+ };
+
+ displayResults(reportData);
+ btn.disabled=false;
+ document.getElementById("loading").classList.add("hidden");
+}
+
+function displayResults(d){
+ const scoreEl=document.getElementById("score");
+ scoreEl.textContent=d.score+"%";
+ scoreEl.style.color=d.classification.color;
+ const bar=document.getElementById("meterBar");
+ bar.style.width=d.score+"%";
+ bar.style.background=d.classification.color;
+ document.getElementById("scoreStatus").textContent=d.classification.label;
+ document.getElementById("scoreStatus").style.color=d.classification.color;
+ document.getElementById("scoreDescription").textContent=
+  d.classification.description;
+
+ let quick=[
+  ["Website","الموقع",d.host],
+  ["HTTPS","التشفير",d.url.startsWith("https:")?"متوفر":"غير متوفر"],
+  ["IP Address","عنوان IP",d.ipAddress],
+  ["DNS","سجلات DNS",d.dnsStatus],
+  ["Domain","النطاق",d.rdapStatus]
+ ];
+ document.getElementById("quickResults").innerHTML=quick.map(x=>
+  `<div class="item"><small>${x[0]} / ${x[1]}</small><strong>${escapeHTML(x[2])}</strong></div>`
+ ).join("");
+
+ buildReport(d);
+ document.getElementById("resultPanel").classList.remove("hidden");
+ document.getElementById("report").classList.remove("hidden");
+}
+
+function buildReport(d){
+ let checksHTML=d.checks.map(c=>{
+  let result=c.pass===null?"غير معروف / Unknown":
+   c.pass?"اجتاز / Pass":"لم يجتز / Fail";
+  return `<p><b>${escapeHTML(c.name)} - ${escapeHTML(c.arabic)}:</b>
+  ${escapeHTML(result)} — ${escapeHTML(c.detail)}</p>`;
+ }).join("");
+
+ let location=[
+  d.ipInfo.city,d.ipInfo.region,d.ipInfo.country
+ ].filter(Boolean).join(" - ")||"غير متاح";
+
+ let errorsHTML=d.errors.length?
+  d.errors.map(x=>`<p>${escapeHTML(x)}</p>`).join(""):
+  "<p>لا توجد أخطاء مسجلة.</p>";
+
+ let html=`
+ ${section("1. ملخص التقرير | Executive Summary",
+  `<p><b>رابط الموقع:</b> <span dir="ltr">${escapeHTML(d.url)}</span></p>
+   <p><b>تاريخ الفحص:</b> ${escapeHTML(d.now)}</p>
+   <p><b>رقم التقرير:</b> ${escapeHTML(d.reportID)}</p>
+   <p><b>نتيجة تقييم الأمان:</b> <span class="report-score" style="color:${d.classification.color}">${d.score}%</span></p>
+   <p><b>التصنيف:</b> ${escapeHTML(d.classification.label)}</p>
+   <p>${escapeHTML(d.classification.description)}</p>`
+ )}
+ ${section("2. تفاصيل النطاق | Domain Information",
+  `<p><b>Domain:</b> ${escapeHTML(d.domain)}</p>
+   <p><b>Registrar:</b> ${escapeHTML(d.details.registrar||"غير متاح")}</p>
+   <p><b>Registration Date:</b> ${escapeHTML(d.details.created||"غير متاح")}</p>
+   <p><b>Expiration Date:</b> ${escapeHTML(d.details.expiry||"غير متاح")}</p>
+   <p><b>RDAP Status:</b> ${escapeHTML(d.rdapStatus)}</p>`
+ )}
+ ${section("3. معلومات الشبكة | Network Intelligence",
+  `<p><b>IP Address:</b> ${escapeHTML(d.ipAddress)}</p>
+   <p><b>Country:</b> ${escapeHTML(d.ipInfo.country||"غير متاح")}</p>
+   <p><b>City / Region:</b> ${escapeHTML(location)}</p>
+   <p><b>ISP:</b> ${escapeHTML(d.ipInfo.connection?.isp||"غير متاح")}</p>
+   <p><b>Organization:</b> ${escapeHTML(d.ipInfo.connection?.org||"غير متاح")}</p>
+   <p><b>DNS:</b> ${escapeHTML(d.dnsStatus)}</p>`
+ )}
+ ${section("4. نتائج الفحص | Security Checks",checksHTML)}
+ ${section("5. فحص السمعة | Reputation Analysis",
+  `<p>VirusTotal: لم يتم الاتصال تلقائيًا بواجهة API.</p>
+   <p>URLScan: لم يتم تنفيذ فحص تلقائي.</p>
+   <p>Google Safe Browsing: لم يتم التحقق عبر API.</p>
+   <p>يمكن مراجعة الرابط يدويًا من الخدمات التالية.</p>
+   <p><a href="https://www.virustotal.com/gui/home/url" target="_blank">VirusTotal</a></p>
+   <p><a href="https://urlscan.io/" target="_blank">URLScan</a></p>
+   <p><a href="https://transparencyreport.google.com/safe-browsing/search" target="_blank">Google Safe Browsing</a></p>`
+ )}
+ ${section("6. التوصيات الأمنية | Security Recommendations",
+  `<p>1. لا تدخل كلمات المرور أو بيانات الدفع قبل التأكد من موثوقية الموقع.</p>
+   <p>2. تحقق من سمعة النطاق باستخدام خدمات فحص السمعة.</p>
+   <p>3. لا تحمل ملفات مجهولة المصدر.</p>
+   <p>4. وجود HTTPS وحده لا يعني أن الموقع آمن.</p>
+   <p>5. أعد التحقق من الموقع عند ظهور تحذيرات المتصفح.</p>`
+ )}
+ ${section("7. أخطاء وقيود الفحص | Errors and Limitations",errorsHTML)}
+ <div class="report-section">
+ <h3>English Security Assessment</h3>
+ <p><b>Website:</b> <span dir="ltr">${escapeHTML(d.host)}</span></p>
+ <p><b>Security Score:</b> ${d.score}%</p>
+ <p><b>Classification:</b> ${escapeHTML(d.classification.label)}</p>
+ <p><b>Report ID:</b> ${escapeHTML(d.reportID)}</p>
+ <p>This score is calculated from available checks only. Unknown checks are excluded from the score. It is not a guarantee that the website is safe.</p>
+ <p>Reputation checks are not automatically performed in this version.</p>
+ </div>
+ `;
+ document.getElementById("reportContent").innerHTML=html;
+ reportText=document.getElementById("report").innerText;
+}
+
+function printReport(){
+ window.print();
+}
+
+function downloadTXT(){
+ if(!reportText){alert("لا يوجد تقرير");return}
+ const blob=new Blob([reportText],{type:"text/plain;charset=utf-8"});
+ const link=document.createElement("a");
+ link.href=URL.createObjectURL(blob);
+ link.download="Cap-Abdelrhman-Security-Report.txt";
+ link.click();
+ URL.revokeObjectURL(link.href);
+}
+
+async function copyReport(){
+ if(!reportText)return;
+ try{
+  await navigator.clipboard.writeText(reportText);
+  alert("تم نسخ التقرير");
+ }catch(e){alert("تعذر النسخ من المتصفح")}
+}
+
+function clearAll(){
+ document.getElementById("urlInput").value="";
+ document.getElementById("resultPanel").classList.add("hidden");
+ document.getElementById("report").classList.add("hidden");
+ reportText="";
+ reportData={};
+}
+</script>
+</body>
+</html>
